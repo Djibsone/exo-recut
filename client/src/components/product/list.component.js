@@ -34,10 +34,11 @@ export default function List() {
         if (!isConfirmed) return;
 
         try {
-            await axios.delete(`http://localhost:8000/api/products/${id}`);
+            const response = await axios.delete(`http://localhost:8000/api/products/${id}`);
             Swal.fire({
                 icon: 'success',
-                text: 'Product has been deleted successfully.'
+                text: response.data.message
+                // text: 'Product has been deleted successfully.'
             });
             fetchProducts();
         } catch (error) {

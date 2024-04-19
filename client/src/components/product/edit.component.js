@@ -1,71 +1,86 @@
 import React, { useEffect, useState } from "react";
-import Form from 'react-bootstrap/Form'
+import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
-export default function EditUser() {
+export default function EditProduct() {
   const navigate = useNavigate();
-
-  const { id } = useParams()
-
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [image, setImage] = useState(null)
-  const [validationError,setValidationError] = useState({})
+  const { id } = useParams();
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [image, setImage] = useState(null);
+  const [category_id, setCategoryId] = useState("");
+  const [categories, setCategories] = useState([]);
+  const [validationError,setValidationError] = useState({});
 
   useEffect(()=>{
-    fetchProduct()
-  },[])
+    fetchProduct();
+    fetchCategories();
+  },[]);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get(`http://127.0.0.1:8000/api/categories`);
+      setCategories(response.data.categories);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
 
   const fetchProduct = async () => {
-    await axios.get(`http://localhost:8000/api/products/${id}`).then(({data})=>{
-      const { title, description } = data.product
-      setTitle(title)
-      setDescription(description)
-    }).catch(({response:{data}})=>{
+    try {
+      const response = await axios.get(`http://localhost:8000/api/products/${id}`);
+      const { title, description, category_id } = response.data.product;
+      setTitle(title);
+      setDescription(description);
+      setCategoryId(category_id);
+    } catch (error) {
       Swal.fire({
-        text:data.message,
-        icon:"error"
-      })
-    })
-  }
+        text: error.response.data.message,
+        icon: "error"
+      });
+    }
+  };
 
   const changeHandler = (event) => {
-		setImage(event.target.files[0]);
-	};
+    setImage(event.target.files[0]);
+  };
 
   const updateProduct = async (e) => {
     e.preventDefault();
-
-    const formData = new FormData()
-    formData.append('_method', 'PATCH');
-    formData.append('title', title)
-    formData.append('description', description)
-    if(image!==null){
-      formData.append('image', image)
+  
+    const formData = new FormData();
+    formData.append('_method', 'PUT');
+    formData.append('title', title);
+    formData.append('description', description);
+    formData.append('category_id', category_id);
+  
+    if (image !== null) {
+      formData.append('image', image);
     }
-
-    await axios.put(`http://localhost:8000/api/products/${id}`, formData).then(({data})=>{
+  
+    try {
+      const response = await axios.post(`http://localhost:8000/api/products/${id}`, formData);
       Swal.fire({
-        icon:"success",
-        text:data.message
-      })
-      navigate("/")
-    }).catch(({response})=>{
-      if(response.status===422){
-        setValidationError(response.data.errors)
-      }else{
+        icon: "success",
+        text: response.data.message
+      });
+      navigate("/");
+    } catch (error) {
+      if (error.response && error.response.status === 422) {
+        setValidationError(error.response.data.errors);
+      } else {
         Swal.fire({
-          text:response.data.message,
-          icon:"error"
-        })
+          text: error.response.data.message,
+          icon: "error"
+        });
       }
-    })
-  }
+    }
+  };  
 
   return (
     <div className="container">
@@ -93,7 +108,7 @@ export default function EditUser() {
                     </div>
                   )
                 }
-                <Form onSubmit={updateProduct}>
+                <Form onSubmit={updateProduct} encType="multipart/form-data">
                   <Row> 
                       <Col>
                         <Form.Group controlId="Name">
@@ -122,6 +137,22 @@ export default function EditUser() {
                       </Form.Group>
                     </Col>
                   </Row>
+                  <Form.Group controlId="Category">
+                      <Form.Label>Category</Form.Label>
+                      <Form.Control 
+                          as="select" 
+                          name="category_id" 
+                          value={category_id}
+                          onChange={(event)=> {
+                              setCategoryId(event.target.value )
+                          }}
+                      >
+                          <option value="">Select category</option>
+                          {categories.map((category) => (
+                              <option key={category.id} value={category.id}>{category.name}</option>
+                          ))}
+                      </Form.Control>
+                  </Form.Group>
                   <Button variant="primary" className="mt-2" size="lg" block="block" type="submit">
                     Update
                   </Button>
@@ -132,5 +163,5 @@ export default function EditUser() {
         </div>
       </div>
     </div>
-  )
+  );
 }
