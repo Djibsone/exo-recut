@@ -7,6 +7,7 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Http\Requests\ProductRequest;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
@@ -28,32 +29,10 @@ class ProductController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(ProductRequest $request)
-    {
-        try {
-            $validatedData = $request->validated();
-
-            $product = Product::create($validatedData);
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Le produit a bien été créé.',
-                'product' => $product,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json($e);
-        }
-    }
     // public function store(ProductRequest $request)
     // {
     //     try {
     //         $validatedData = $request->validated();
-    //         $image = $validatedData['image'];
-    //         $imageName = Str::random() . '.' . $image->getClientOriginalExtension();
-    //         Storage::disk('public')->putFileAs('product/image', $image, $imageName);
-
-    //         $validatedData['image'] = $imageName;
-    //         $validatedData['category_id'] = 2;
 
     //         $product = Product::create($validatedData);
 
@@ -66,6 +45,53 @@ class ProductController extends Controller
     //         return response()->json($e);
     //     }
     // }
+
+    // public function store(ProductRequest $request)
+    // {
+    //     try {
+    //         $validatedData = $request->validated();
+
+    //         if ($request->hasFile('image')) {
+    //             $image = $validatedData['image'];
+    //             $imageName = Str::random() . '.' . $image->getClientOriginalExtension();
+    //             Storage::disk('public')->putFileAs('product/image', $image, $imageName);
+
+    //             $validatedData['image'] = $imageName;
+    //         }
+
+    //         $product = Product::create($validatedData);
+
+    //         return response()->json([
+    //             'status' => 'success',
+    //             'message' => 'Le produit a bien été créé.',
+    //             'product' => $product,
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         return response()->json($e);
+    //     }
+    // }
+
+    public function store(ProductRequest $request)
+    {
+        $validatedData = $request->validated();
+
+        if ($request->hasFile('image')) {
+            $fileNameWithExt = $request->file('image')->getClientOriginalName();
+            $fileName = pathinfo($fileNameWithExt, PATHINFO_FILENAME);
+            $extension = $request->file('image')->getClientOriginalExtension();
+            $fileNameToStore = $fileName . '_' . time() . '.' . $extension;
+            $path = $request->file('image')->storeAs('public/product/image', $fileNameToStore);
+            $validatedData['image'] = $fileNameToStore;
+        }
+
+        $product = Product::create($validatedData);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Le produit a bien été créé.',
+            'product' => $product,
+        ]);
+    }
 
     /**
      * Display the specified resource.
@@ -87,36 +113,30 @@ class ProductController extends Controller
      */
     public function update(ProductRequest $request, Product $product)
     {
-        try {
-            $validatedData = $request->validated();
+        $validatedData = $request->validated();
 
-            if ($request->hasFile('image')) {
-                // Supprimer l'ancienne image si elle existe
-                if ($product->image) {
-                    $exists = Storage::disk('public')->exists('product/image/' . $product->image);
-                    if ($exists) {
-                        Storage::disk('public')->delete('product/image/' . $product->image);
-                    }
-                }
+        if ($request->hasFile('image')) {
+            $oldImagePath = $product->image; // Chemin de l'ancienne image
+            $fileNameWithExt = $request->file('image')->getClientOriginalName();
+            $fileName = pathinfo($fileNameWithExt, PATHINFO_FILENAME);
+            $extension = $request->file('image')->getClientOriginalExtension();
+            $fileNameToStore = $fileName . '_' . time() . '.' . $extension;
+            $path = $request->file('image')->storeAs('public/product/image', $fileNameToStore);
+            $validatedData['image'] = $fileNameToStore;
 
-                // Téléverser la nouvelle image
-                $image = $request->file('image');
-                $imageName = Str::random() . '.' . $image->getClientOriginalExtension();
-                Storage::disk('public')->putFileAs('product/image', $image, $imageName);
-                $validatedData['image'] = $imageName;
+            // Suppression de l'ancienne image si elle existe
+            if ($oldImagePath && Storage::disk('public')->exists('product/image/' . $oldImagePath)) {
+                Storage::disk('public')->delete('product/image/' . $oldImagePath);
             }
-
-            // Mettre à jour les autres champs du produit
-            $updateProduct = $product->update($validatedData);
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Le produit a bien été modifié.',
-                'product' => $updateProduct,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json($e);
         }
+
+        $product->update($validatedData);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Le produit a bien été mis à jour.',
+            'product' => $product,
+        ]);
     }
 
     /**
